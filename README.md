@@ -15,7 +15,7 @@ This repo is developed and tested on:
 
 |System| CUDA|Python|Tensorflow|
 |---|---|---|---|
-|18.04.2 LTS|10.2|3.6.8|1.13.2|
+|Ubuntu 18.04.2 LTS|10.2|3.6.8|1.13.2|
 
 
 

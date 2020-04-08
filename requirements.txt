@@ -1,0 +1,7 @@
+absl
+six
+validators
+numpy>=1.15.4
+flask
+pickle
+nltk

@@ -39,7 +39,7 @@ def _trim_and_decode(ids, subtokenizer):
         return subtokenizer.decode(ids) 
 
 def translate_list(vocab, model_dir, params, contentList, url_list = []):
-    
+    u_list = url_list
     translation_results = []
     url_count = 0
     
@@ -55,7 +55,7 @@ def translate_list(vocab, model_dir, params, contentList, url_list = []):
         new_content_split = []
         for word in content_split:
             if validators.url(word):
-                url_list.append(word)
+                u_list.append(word)
                 
                 word = _TOKEN + str(url_count)
                 url_count += 1
@@ -71,7 +71,7 @@ def translate_list(vocab, model_dir, params, contentList, url_list = []):
         except:
             print("error in translation")
     
-    return url_list, translation_results
+    return u_list, translation_results
 
 def remove_space(txt):
     words = txt.split(' ')
@@ -124,7 +124,7 @@ def main(unused_argv):
         elif lang_pair == "jp_zh":
             _MODEL_DIR = _PRODUCTION_MODEL_PATH + "jp_en"
         _VOCAB = _MODEL_DIR + "/vocab"
-        
+        url_list = []
         url_list, translation_results = translate_list(_VOCAB, _MODEL_DIR, params, contentList)
 
         if lang_pair == "fr_zh" or lang_pair == "jp_zh":

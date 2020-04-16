@@ -38,10 +38,36 @@ def _trim_and_decode(ids, subtokenizer):
     except ValueError:
         return subtokenizer.decode(ids) 
 
-def translate_list(vocab, model_dir, params, contentList, url_list = []):
-    u_list = url_list
+def extract_special(contentList, replaced_words):   
+    replace_count = len(replaced_words)
+    new_contentList = []
+    for content in contentList:
+        content_split = content.split(' ')
+        new_content_split = []
+        for word in content_split:
+            #Replace URLs and words start with # or @
+            if validators.url(word) or word[0]=='#' or word[0]=='@':
+                print(word, " triggers the replacement rule")
+                replaced_words.append(word)
+                word = _TOKEN + str(replace_count).zfill(3)
+                replace_count += 1
+            new_content_split.append(word)
+        new_content = ' '.join(new_content_split)
+        new_contentList.append(new_content)
+    return new_contentList, replaced_words
+
+def replace_special(translation_result, replaced_words):
+    if len(replaced_words) > 0:
+        replace_count = 0
+        for word in replaced_words:
+            token = _TOKEN + str(replace_count).zfill(3)
+            #extra space required for formatting 
+            translation_result = translation_result.replace(token, word + " ") 
+            replace_count += 1
+    return translation_result
+
+def translate_list(vocab, model_dir, params, contentList):
     translation_results = []
-    url_count = 0
     
     subtokenizer = tokenizer.Subtokenizer(vocab)
     estimator = tf.estimator.Estimator(
@@ -50,18 +76,6 @@ def translate_list(vocab, model_dir, params, contentList, url_list = []):
     estimator_predictor = tf.contrib.predictor.from_estimator(estimator, export.build_tensor_serving_input_receiver_fn(shape=[None], dtype=tf.int32, batch_size=None))
     
     for content in contentList:
-        # Replace URL with TOKENs
-        content_split = content.split(' ')
-        new_content_split = []
-        for word in content_split:
-            if validators.url(word):
-                u_list.append(word)
-                
-                word = _TOKEN + str(url_count)
-                url_count += 1
-                
-            new_content_split.append(word)
-            content = ' '.join(new_content_split)
         try:
             tokens = _encode_and_add_eos(content, subtokenizer)
             predictions = estimator_predictor({"input":np.array([tokens],dtype=np.int32)})
@@ -71,7 +85,7 @@ def translate_list(vocab, model_dir, params, contentList, url_list = []):
         except:
             print("error in translation")
     
-    return u_list, translation_results
+    return translation_results
 
 def remove_space(txt):
     words = txt.split(' ')
@@ -97,8 +111,8 @@ def remove_punct(txt):
     return txt
 
 def main(unused_argv):
-    tf.logging.set_verbosity(tf.logging.INFO)
-
+    tf.logging.set_verbosity(tf.logging.INFO) 
+    #Change it to above INFO(20) for shorter log file
     socket_api = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     socket_api.bind((_HOST_ADD, _RECV_PORT))
     socket_api.listen(5)
@@ -124,16 +138,15 @@ def main(unused_argv):
         elif lang_pair == "jp_zh":
             _MODEL_DIR = _PRODUCTION_MODEL_PATH + "jp_en"
         _VOCAB = _MODEL_DIR + "/vocab"
-        url_list = []
-        url_list, translation_results = translate_list(_VOCAB, _MODEL_DIR, params, contentList)
+        replaced_words = []
+        new_contentList, replaced_words = extract_special(contentList, replaced_words)
+        translation_results = translate_list(_VOCAB, _MODEL_DIR, params, new_contentList)
 
         if lang_pair == "fr_zh" or lang_pair == "jp_zh":
             _MODEL_DIR = _PRODUCTION_MODEL_PATH + "en_zh"
             _VOCAB = _MODEL_DIR + "/vocab"
             contentList = translation_results
-            
-            url_list, translation_results = translate_list(_VOCAB, _MODEL_DIR, params, contentList, url_list)
-            
+            translation_results = translate_list(_VOCAB, _MODEL_DIR, params, contentList)
         translation_result = ' '.join(translation_results)
         
         # Post-Process Added
@@ -141,16 +154,7 @@ def main(unused_argv):
             translation_result = remove_space(translation_result)
         translation_result = remove_brackets(translation_result)
         translation_result = remove_punct(translation_result)
-                
-        
-        # Replace TOKENs with original URL
-        if(len(url_list)>0):
-            
-            new_count = 0
-            for _url in url_list:
-                word = _TOKEN + str(new_count)
-                translation_result = translation_result.replace(word, _url + " ") #extra space required for formatting 
-                new_count += 1           
+        translation_result = replace_special(translation_result, replaced_words)        
         
         try:
             client_socket.send(pickle.dumps(translation_result))

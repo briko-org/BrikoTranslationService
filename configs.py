@@ -12,7 +12,7 @@ _ALPHA = 0.6
 
 _MODEL_PARAM_SET = "big"
 
-_TOKEN = '$TOKEN$'
+_TOKEN = 'T0K3N'
 
 LOG_FILE_NAME = "api_service.log"
 _MODELS_PATH = "/path/to/models/"
